@@ -1,0 +1,1146 @@
+#ifndef INCLUDE_CAUSTICA_TONEMAP
+#define INCLUDE_CAUSTICA_TONEMAP
+
+// =====================================================================
+// Tonemap Caustica (PEQHUB/Caustica, shaders/display/display.comp,
+// commit 601856c). Lisensi Caustica: LGPL v3+.
+// PsychoV diturunkan dari RenoDX (MIT, Carlos Lopez Jr.).
+// Rumus tidak diubah; hanya nama generik diberi awalan ct/CT_.
+// =====================================================================
+
+// ---------- Pengganti push constant Caustica ----------
+struct CausticaPush {
+    int hdrEnabled;
+    int hdrTonemapMode;
+    int sdrTonemapMode;
+    float paperWhiteNits;
+    float headroom;
+    float psychoHighlights;
+    float psychoShadows;
+    float psychoContrast;
+    float psychoPurity;
+    float psychoBleaching;
+    float psychoHueRestore;
+    float psychoAdaptContrast;
+    float psychoClipPoint;
+    float psychoWhiteCurve;
+    float psychoConeExponent;
+    float sdrPsychoPeak;
+    float sdrParam0;
+    float sdrParam1;
+    float sdrParam2;
+    float sdrParam3;
+    float sdrParam4;
+    float sdrParam5;
+    float sdrParam6;
+    float sdrParam7;
+    int debugView;
+    float sdrPsychoV23Compression;
+    float sdrPsychoV23GamutCompression;
+    float hdrPsychoV23Compression;
+    float hdrPsychoV23GamutCompression;
+    float sdrPsychoV23Peak;
+};
+CausticaPush pc;
+
+const int HDR_TONEMAP_EETF = 0;
+const int HDR_TONEMAP_CAUSTICA = 1;
+const int HDR_TONEMAP_PSYCHOV = 2;
+const int HDR_TONEMAP_PSYCHOV23 = 3;
+
+const int SDR_TONEMAP_PBR_NEUTRAL = 0;
+const int SDR_TONEMAP_REINHARD = 1;
+const int SDR_TONEMAP_ACES = 2;
+const int SDR_TONEMAP_AGX = 3;
+const int SDR_TONEMAP_LOTTES = 4;
+const int SDR_TONEMAP_FROSTBITE = 5;
+const int SDR_TONEMAP_UNCHARTED2 = 6;
+const int SDR_TONEMAP_GT = 7;
+const int SDR_TONEMAP_PSYCHOV = 8;
+const int SDR_TONEMAP_PSYCHOV23 = 9;
+
+const vec3 CT_LUMA_BT709 = vec3(0.2126, 0.7152, 0.0722);
+
+// ---------- AgX ----------
+const mat3 CT_AGX_INSET = mat3(
+    0.842479062253094, 0.042328242261012, 0.042375654905705,
+    0.078433599999999, 0.878468636469772, 0.078433600000000,
+    0.079223745147764, 0.079166127460543, 0.879142973793104
+);
+
+const mat3 CT_AGX_OUTSET = mat3(
+    1.196879005120170, -0.052896851757456, -0.052971635514443,
+    -0.098020881140137, 1.151903129904170, -0.098043450117124,
+    -0.099029744079720, -0.098961176844843, 1.151073672641160
+);
+
+const float CT_AGX_MIN_EV = -12.47393;
+const float CT_AGX_MAX_EV = 4.026069;
+
+vec3 ctAgxDefaultContrast(vec3 x) {
+    vec3 x2 = x * x;
+    vec3 x4 = x2 * x2;
+    return 15.5 * x4 * x2
+        - 40.14 * x4 * x
+        + 31.96 * x4
+        - 6.868 * x2 * x
+        + 0.4298 * x2
+        + 0.1191 * x
+        - 0.00232;
+}
+
+vec3 ctAgx(vec3 color) {
+    color = CT_AGX_INSET * max(color, vec3(0.0));
+    color = clamp(log2(max(color, vec3(1.0e-10))), CT_AGX_MIN_EV, CT_AGX_MAX_EV);
+    color = (color - CT_AGX_MIN_EV) / (CT_AGX_MAX_EV - CT_AGX_MIN_EV);
+    color = ctAgxDefaultContrast(color);
+    color = CT_AGX_OUTSET * color;
+    return clamp(color, 0.0, 1.0);
+}
+
+// ---------- PQ (hanya dipakai jalur HDR) ----------
+const float CT_PQ_M1 = 0.1593017578125;
+const float CT_PQ_M2 = 78.84375;
+const float CT_PQ_C1 = 0.8359375;
+const float CT_PQ_C2 = 18.8515625;
+const float CT_PQ_C3 = 18.6875;
+
+float ctPqEncode(float nits) {
+    float y = pow(max(nits, 0.0) / 10000.0, CT_PQ_M1);
+    return pow((CT_PQ_C1 + CT_PQ_C2 * y) / (1.0 + CT_PQ_C3 * y), CT_PQ_M2);
+}
+
+vec3 ctPqEncodeNits(vec3 nits) {
+    return vec3(ctPqEncode(nits.r), ctPqEncode(nits.g), ctPqEncode(nits.b));
+}
+
+vec3 ctLinearToSrgb(vec3 c) {
+    c = clamp(c, 0.0, 1.0);
+    bvec3 hi = greaterThan(c, vec3(0.0031308));
+    vec3 lo = c * 12.92;
+    vec3 hiV = 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055;
+    return mix(lo, hiV, hi);
+}
+
+vec3 ctApplyContrastSaturation(vec3 color, float contrast, float saturation) {
+    color = clamp((color - 0.5) * max(contrast, 0.0) + 0.5, 0.0, 1.0);
+    float luma = dot(color, CT_LUMA_BT709);
+    return clamp(mix(vec3(luma), color, max(saturation, 0.0)), 0.0, 1.0);
+}
+
+const mat3 CT_BT709_TO_BT2020 = mat3(
+    0.6274039, 0.0690973, 0.0163916,
+    0.3292830, 0.9195406, 0.0880132,
+    0.0433131, 0.0113612, 0.8955953
+);
+
+const mat3 CT_BT2020_TO_BT709 = mat3(
+     1.6604910, -0.1245505, -0.0181508,
+    -0.5876411,  1.1328999, -0.1005789,
+    -0.0728499, -0.0083494,  1.1187297
+);
+
+float ctSafeDiv(float a, float b, float fallback) {
+    return abs(b) <= 1.0e-12 ? fallback : a / b;
+}
+
+// ---------- HDR: BT.2390 EETF ----------
+float bt2390EetfPq(float e) {
+    float targetPeakNits = clamp(pc.paperWhiteNits * pc.headroom, 1.0, 10000.0);
+    float maxLum = ctPqEncode(targetPeakNits);
+    float ks = clamp(1.5 * maxLum - 0.5, 0.0, 1.0);
+    float e1 = clamp(e, 0.0, 1.0);
+    if (e1 < ks || ks >= 0.999999) {
+        return e1;
+    }
+
+    float t = clamp((e1 - ks) / max(1.0 - ks, 1.0e-6), 0.0, 1.0);
+    float t2 = t * t;
+    float t3 = t2 * t;
+    float e2 = (2.0 * t3 - 3.0 * t2 + 1.0) * ks
+        + (t3 - 2.0 * t2 + t) * (1.0 - ks)
+        + (-2.0 * t3 + 3.0 * t2) * maxLum;
+    return clamp(e2, 0.0, 1.0);
+}
+
+vec3 tonemapHdrEetf(vec3 hdr, float exposure) {
+    vec3 paperReferred709 = max(hdr * exposure, vec3(0.0));
+    vec3 nits2020 = max(CT_BT709_TO_BT2020 * (paperReferred709 * pc.paperWhiteNits), vec3(0.0));
+    vec3 pq = ctPqEncodeNits(nits2020);
+    return vec3(bt2390EetfPq(pq.r), bt2390EetfPq(pq.g), bt2390EetfPq(pq.b));
+}
+
+// ---------- HDR: Caustica rolloff ----------
+vec3 tonemapHdrCaustica(vec3 hdr, float exposure) {
+    vec3 c = max(hdr * exposure, vec3(0.0));
+    vec3 lo = min(c, vec3(1.0));
+    vec3 hi = max(c - vec3(1.0), vec3(0.0));
+    float k = max(pc.headroom - 1.0, 0.0);
+    vec3 rolled = (k > 0.0) ? (k * hi) / (k + hi) : vec3(0.0);
+    vec3 paperReferred = lo + rolled;
+    vec3 nits2020 = max(CT_BT709_TO_BT2020 * (paperReferred * pc.paperWhiteNits), vec3(0.0));
+    return ctPqEncodeNits(nits2020);
+}
+
+// ---------- PsychoV ----------
+const mat3 PSYCHO_BT2020_TO_XYZ = mat3(
+    0.6369580483, 0.2627002120, 0.0000000000,
+    0.1446169036, 0.6779980715, 0.0280726930,
+    0.1688809752, 0.0593017165, 1.0609850577);
+
+const mat3 PSYCHO_XYZ_TO_BT2020 = mat3(
+     1.7166511880, -0.6666843518,  0.0176398574,
+    -0.3556707838,  1.6164812366, -0.0427706133,
+    -0.2533662814,  0.0157685458,  0.9421031212);
+
+const mat3 PSYCHO_XYZ_TO_LMS = mat3(
+    0.2670502842655792,  -0.38706882411220156, 0.026727793989083093,
+    0.8471990148492798,   1.165429935890458,   -0.02729131667566509,
+   -0.03470416612462053,  0.10302286696614202,  0.5333267257603284);
+
+const mat3 PSYCHO_LMS_TO_XYZ = mat3(
+     1.81146296,  0.60691241, -0.05972506,
+    -1.30814926,  0.41590626,  0.08684090,
+     0.37056946, -0.04084826,  1.85436177);
+
+const vec3 PSYCHO_MB_WEIGHTS = vec3(0.68990272, 0.34832189, 0.0371597);
+const vec2 PSYCHO_WHITE_D65 = vec2(0.31272, 0.32903);
+
+vec3 psychoSignPow(vec3 x, vec3 e) {
+    return vec3(
+        (x.x < 0.0 ? -1.0 : 1.0) * pow(abs(x.x), e.x),
+        (x.y < 0.0 ? -1.0 : 1.0) * pow(abs(x.y), e.y),
+        (x.z < 0.0 ? -1.0 : 1.0) * pow(abs(x.z), e.z));
+}
+
+vec3 psychoLMSFromBT2020(vec3 bt2020) {
+    return PSYCHO_XYZ_TO_LMS * (PSYCHO_BT2020_TO_XYZ * bt2020);
+}
+
+vec3 psychoBT2020FromLMS(vec3 lmsAbs) {
+    return PSYCHO_XYZ_TO_BT2020 * (PSYCHO_LMS_TO_XYZ * lmsAbs);
+}
+
+float psychoLuminanceFromLMS(vec3 lms) {
+    return dot(lms, vec3(0.68990272, 0.34832189, 0.0));
+}
+
+float psychoMBYFromLMS(vec3 lms) {
+    return PSYCHO_MB_WEIGHTS.x * lms.x + PSYCHO_MB_WEIGHTS.y * lms.y;
+}
+
+vec3 psychoMB2FromLMS(vec3 lms) {
+    const float eps = 1.0e-12;
+    float wl = PSYCHO_MB_WEIGHTS.x * lms.x;
+    float wm = PSYCHO_MB_WEIGHTS.y * lms.y;
+    float yMb = wl + wm;
+    if (yMb <= eps) {
+        return vec3(0.0);
+    }
+    float inv = ctSafeDiv(1.0, yMb, 0.0);
+    return vec3(wl * inv, PSYCHO_MB_WEIGHTS.z * lms.z * inv, yMb);
+}
+
+vec3 psychoLMSFromMB2(vec3 mb2) {
+    float l = mb2.x;
+    float s = mb2.y;
+    float y = max(mb2.z, 0.0);
+    float L = ctSafeDiv(l * y, PSYCHO_MB_WEIGHTS.x, 0.0);
+    float M = ctSafeDiv((1.0 - l) * y, PSYCHO_MB_WEIGHTS.y, 0.0);
+    float S = ctSafeDiv(s * y, PSYCHO_MB_WEIGHTS.z, 0.0);
+    return vec3(L, M, S);
+}
+
+vec3 psychoXYZFromxyY(vec3 xyY) {
+    vec3 xyz;
+    xyz.xz = vec2(xyY.x, 1.0 - xyY.x - xyY.y) / xyY.y * xyY.z;
+    xyz.y = xyY.z;
+    return xyz;
+}
+
+vec2 psychoWhiteD65Chromaticity() {
+    vec3 d65Xyz = psychoXYZFromxyY(vec3(PSYCHO_WHITE_D65, 1.0));
+    vec3 d65Lms = PSYCHO_XYZ_TO_LMS * d65Xyz;
+    return psychoMB2FromLMS(d65Lms).xy;
+}
+
+vec2 psychoMBFromLMS(vec3 lms) {
+    float yMb = psychoMBYFromLMS(lms);
+    if (yMb <= 0.0) {
+        return vec2(0.0);
+    }
+    return vec2(
+        ctSafeDiv(PSYCHO_MB_WEIGHTS.x * lms.x, yMb, 0.0),
+        ctSafeDiv(PSYCHO_MB_WEIGHTS.z * lms.z, yMb, 0.0));
+}
+
+vec2 psychoMBFromBT2020Primary(vec3 primaryRgb) {
+    vec3 xyz = PSYCHO_BT2020_TO_XYZ * primaryRgb;
+    vec3 lms = PSYCHO_XYZ_TO_LMS * xyz;
+    return psychoMBFromLMS(lms);
+}
+
+float psychoCross2(vec2 a, vec2 b) {
+    return a.x * b.y - a.y * b.x;
+}
+
+bool psychoRaySegmentHit2D(vec2 origin, vec2 dir, vec2 a, vec2 b, out float tHit) {
+    const float eps = 1.0e-20;
+    tHit = 0.0;
+    vec2 e = b - a;
+    float denom = psychoCross2(dir, e);
+    if (abs(denom) <= eps) {
+        return false;
+    }
+    vec2 ao = a - origin;
+    float t = psychoCross2(ao, e) / denom;
+    float u = psychoCross2(ao, dir) / denom;
+    if (t < 0.0 || u < 0.0 || u > 1.0) {
+        return false;
+    }
+    tHit = t;
+    return true;
+}
+
+float psychoRayMaxTBT2020(vec2 origin, vec2 direction, out bool hasSolution) {
+    const float intervalMax = 1.0e30;
+    const float eps = 1.0e-14;
+    hasSolution = false;
+    if (dot(direction, direction) <= eps) {
+        return 0.0;
+    }
+
+    vec2 r = psychoMBFromBT2020Primary(vec3(1.0, 0.0, 0.0));
+    vec2 g = psychoMBFromBT2020Primary(vec3(0.0, 1.0, 0.0));
+    vec2 b = psychoMBFromBT2020Primary(vec3(0.0, 0.0, 1.0));
+
+    float tBest = intervalMax;
+    float t;
+    bool hitAny = false;
+
+    if (psychoRaySegmentHit2D(origin, direction, r, g, t)) { tBest = min(tBest, t); hitAny = true; }
+    if (psychoRaySegmentHit2D(origin, direction, g, b, t)) { tBest = min(tBest, t); hitAny = true; }
+    if (psychoRaySegmentHit2D(origin, direction, b, r, t)) { tBest = min(tBest, t); hitAny = true; }
+
+    hasSolution = hitAny;
+    return hitAny ? max(tBest, 0.0) : 0.0;
+}
+
+vec3 psychoGamutCompress(vec3 lms) {
+    const float eps = 1.0e-14;
+    float yMb = psychoMBYFromLMS(abs(lms));
+    vec2 white = psychoWhiteD65Chromaticity();
+    vec2 mb0 = psychoMBFromLMS(lms);
+    vec2 direction = mb0 - white;
+    if (dot(direction, direction) < eps) {
+        return lms;
+    }
+
+    bool hasSolution;
+    float tMax = psychoRayMaxTBT2020(white, direction, hasSolution);
+    if (!hasSolution) {
+        return lms;
+    }
+
+    float whiteRatio = max(ctSafeDiv(1.0 - tMax, tMax, 0.0), 0.0);
+    float whiteAdd = yMb * whiteRatio;
+    vec3 whiteUnitLms = psychoLMSFromMB2(vec3(white, 1.0));
+    return lms + whiteUnitLms * whiteAdd;
+}
+
+vec3 psychoRestoreHueMB2(vec3 lmsSource, vec3 lmsTarget, float amount) {
+    const float eps = 1.0e-6;
+    float restore = clamp(amount, 0.0, 1.0);
+    if (restore <= 0.0) {
+        return lmsTarget;
+    }
+
+    vec3 mbSource = psychoMB2FromLMS(lmsSource);
+    vec3 mbTarget = psychoMB2FromLMS(lmsTarget);
+    vec2 mbWhite = psychoWhiteD65Chromaticity();
+
+    vec2 sourceOffset = mbSource.xy - mbWhite;
+    vec2 targetOffset = mbTarget.xy - mbWhite;
+    float src2 = dot(sourceOffset, sourceOffset);
+    float tgt2 = dot(targetOffset, targetOffset);
+    if (src2 <= eps || tgt2 <= eps) {
+        return lmsTarget;
+    }
+
+    vec2 sourceDir = sourceOffset * inversesqrt(src2);
+    vec2 targetDir = targetOffset * inversesqrt(tgt2);
+    vec2 blendedDir = mix(targetDir, sourceDir, restore);
+    float blendedLen2 = dot(blendedDir, blendedDir);
+    if (blendedLen2 <= eps) {
+        blendedDir = targetDir;
+    } else {
+        blendedDir *= inversesqrt(blendedLen2);
+    }
+
+    float targetRadius = sqrt(tgt2);
+    vec2 mbRestoredXy = mbWhite + blendedDir * targetRadius;
+    return psychoLMSFromMB2(vec3(mbRestoredXy, mbTarget.z));
+}
+
+vec3 psychoScalePurityMB2(vec3 lms, float purityScale) {
+    const float eps = 1.0e-6;
+    if (abs(purityScale - 1.0) <= eps) {
+        return lms;
+    }
+    vec3 mb = psychoMB2FromLMS(lms);
+    vec2 mbWhite = psychoWhiteD65Chromaticity();
+    vec2 mbOffset = mb.xy - mbWhite;
+    vec2 direction = mbOffset;
+    float offsetLen = length(direction);
+    if (offsetLen < eps) {
+        return lms;
+    }
+
+    float desiredLen = offsetLen * max(purityScale, 0.0);
+    bool hasSolution;
+    float tMax = psychoRayMaxTBT2020(mbWhite, direction / offsetLen, hasSolution);
+    float maxLen = hasSolution ? tMax : offsetLen;
+    float clampedLen = min(desiredLen, maxLen * 0.98);
+    vec2 mbScaled = mbWhite + (direction / offsetLen) * clampedLen;
+    return psychoLMSFromMB2(vec3(mbScaled, mb.z));
+}
+
+float psychoContrastSafe(float x, float contrast, float midGray) {
+    float ratio = x / midGray;
+    float signedPow = (ratio < 0.0 ? -1.0 : 1.0) * pow(abs(ratio), max(contrast, 1.0e-4));
+    return signedPow * midGray;
+}
+
+float psychoHighlightsFn(float x, float highlights, float midGray) {
+    if (highlights > 1.0) {
+        return max(x, mix(x, midGray * pow(max(x / midGray, 0.0), highlights), x));
+    }
+    if (highlights < 1.0) {
+        return min(x, x / (1.0 + midGray * pow(max(x / midGray, 0.0), 2.0 - highlights) - x));
+    }
+    return x;
+}
+
+float psychoShadowsFn(float x, float shadows, float midGray) {
+    if (shadows > 1.0) {
+        return max(x, x * (1.0 + (x * midGray / max(pow(max(x / midGray, 0.0), shadows), 1.0e-6))));
+    }
+    if (shadows < 1.0) {
+        return clamp(x * (1.0 - (x * midGray / max(pow(max(x / midGray, 0.0), 2.0 - shadows), 1.0e-6))), 0.0, x);
+    }
+    return x;
+}
+
+float psychoNeutwo(float x, float peak) {
+    return (peak * x) * inversesqrt(x * x + peak * peak);
+}
+
+float psychoNeutwoClip(float x, float peak, float clip) {
+    float cc = clip * clip;
+    float pp = peak * peak;
+    float xx = x * x;
+    float numerator = clip * peak * x;
+    float denomSq = max(xx * (cc - pp) + cc * pp, 1.0e-12);
+    return numerator * inversesqrt(denomSq);
+}
+
+vec3 psychoNeutwoPerChannel(vec3 color, vec3 peak) {
+    return vec3(
+        psychoNeutwo(color.r, peak.r),
+        psychoNeutwo(color.g, peak.g),
+        psychoNeutwo(color.b, peak.b));
+}
+
+vec3 psychoNeutwoClipPerChannel(vec3 color, vec3 peak, vec3 clip) {
+    return vec3(
+        psychoNeutwoClip(color.r, peak.r, clip.r),
+        psychoNeutwoClip(color.g, peak.g, clip.g),
+        psychoNeutwoClip(color.b, peak.b, clip.b));
+}
+
+vec3 psychoNakaRushton(vec3 x, vec3 peak, vec3 gray, float coneExp) {
+    vec3 safePeak = max(peak, gray + vec3(1.0e-4));
+    vec3 n = max(coneExp, 1.0e-4) * safePeak / (safePeak - gray);
+    vec3 xN = psychoSignPow(x, n);
+    vec3 num = safePeak * xN;
+    vec3 den = pow(max(gray, vec3(1.0e-6)), n - 1.0) * (safePeak - gray) + xN;
+    return num / max(den, vec3(1.0e-6));
+}
+
+vec3 psychoTonemapBT2020(vec3 inputColor, float peakValue, bool compressToBT2020) {
+    const float kEps = 1.0e-6;
+    const float kHalfBleachTrolands = 20000.0;
+    vec3 lmsMidgrayRaw = psychoLMSFromBT2020(vec3(0.18));
+    float lumMidgray = psychoLuminanceFromLMS(lmsMidgrayRaw);
+
+    vec3 lmsColorRaw = psychoLMSFromBT2020(inputColor);
+    float lumCurrent = psychoLuminanceFromLMS(lmsColorRaw);
+    float lumTarget = lumCurrent;
+
+    if (pc.psychoHighlights != 1.0) {
+        lumTarget = psychoHighlightsFn(lumTarget, pc.psychoHighlights, lumMidgray);
+    }
+    if (pc.psychoShadows != 1.0) {
+        lumTarget = psychoShadowsFn(lumTarget, pc.psychoShadows, lumMidgray);
+    }
+    if (pc.psychoContrast != 1.0) {
+        lumTarget = psychoContrastSafe(lumTarget, pc.psychoContrast, lumMidgray);
+    }
+
+    float lumScale = ctSafeDiv(lumTarget, lumCurrent, 1.0);
+    float clipPoint = pc.psychoClipPoint * lumScale;
+    vec3 lmsSceneUnit = lmsColorRaw * lumScale;
+    vec3 lmsMidgrayUnit = lmsMidgrayRaw;
+
+    if (pc.psychoPurity != 1.0) {
+        lmsSceneUnit = psychoScalePurityMB2(lmsSceneUnit, pc.psychoPurity);
+    }
+
+    vec3 lmsSceneUnitSource = lmsSceneUnit;
+    if (pc.psychoAdaptContrast != 1.0) {
+        vec3 lmsSigmaUnit = max(lmsMidgrayUnit, vec3(kEps));
+        float exponent = max(pc.psychoAdaptContrast, kEps);
+
+        vec3 ax = abs(lmsSceneUnit);
+        vec3 axN = pow(ax, vec3(exponent));
+        vec3 sN = pow(lmsSigmaUnit, vec3(exponent));
+        vec3 responseTarget = axN / max(axN + sN, vec3(kEps));
+        vec3 responseBaseline = ax / max(ax + lmsSigmaUnit, vec3(kEps));
+        vec3 gain = responseTarget / max(responseBaseline, vec3(kEps));
+        vec3 signRaw = vec3(
+            lmsSceneUnit.x < 0.0 ? -1.0 : 1.0,
+            lmsSceneUnit.y < 0.0 ? -1.0 : 1.0,
+            lmsSceneUnit.z < 0.0 ? -1.0 : 1.0);
+        lmsSceneUnit = signRaw * (ax * gain);
+
+        if (pc.psychoHueRestore > 0.0) {
+            lmsSceneUnit = psychoRestoreHueMB2(lmsSceneUnitSource, lmsSceneUnit, pc.psychoHueRestore);
+        }
+    }
+
+    vec3 lmsUnit = lmsSceneUnit;
+    if (pc.psychoBleaching != 0.0) {
+        float blendWeight = clamp(pc.psychoBleaching, 0.0, 1.0);
+        float adaptedLum = max(psychoLuminanceFromLMS(max(lmsUnit, vec3(0.0))), 0.18);
+        vec3 adaptedBt2020 = vec3(adaptedLum);
+        vec3 lmsAdaptedUnit = psychoLMSFromBT2020(adaptedBt2020);
+
+        vec3 stimulusNits = max(lmsAdaptedUnit, vec3(0.0)) * 100.0;
+        vec3 stimulusTrolands = stimulusNits * 4.0;
+        vec3 availabilityRaw = 1.0 / (1.0 + stimulusTrolands / max(kHalfBleachTrolands, kEps));
+        vec3 availability = mix(vec3(1.0), availabilityRaw, blendWeight);
+        lmsUnit = lmsUnit * max(availability, vec3(0.0));
+    }
+
+    float peak = max(peakValue, 0.25);
+    vec3 lmsPeakUnit = psychoLMSFromBT2020(vec3(peak));
+    vec3 lmsTonedUnit;
+    if (pc.psychoWhiteCurve > 0.5) {
+        lmsTonedUnit = psychoNakaRushton(lmsUnit, lmsPeakUnit, lmsMidgrayUnit, pc.psychoConeExponent);
+    } else if (clipPoint > peak) {
+        vec3 lmsClipUnit = psychoLMSFromBT2020(vec3(clipPoint));
+        lmsTonedUnit = psychoNeutwoClipPerChannel(lmsUnit, lmsPeakUnit, lmsClipUnit);
+    } else {
+        lmsTonedUnit = psychoNeutwoPerChannel(lmsUnit, lmsPeakUnit);
+    }
+
+    if (pc.psychoHueRestore > 0.0) {
+        lmsTonedUnit = psychoRestoreHueMB2(lmsUnit, lmsTonedUnit, pc.psychoHueRestore);
+    }
+
+    if (compressToBT2020) {
+        lmsTonedUnit = psychoGamutCompress(lmsTonedUnit);
+    }
+    vec3 mapped2020 = psychoBT2020FromLMS(lmsTonedUnit);
+    return compressToBT2020 ? max(mapped2020, vec3(0.0)) : mapped2020;
+}
+
+vec3 tonemapHdrPsychoV(vec3 hdr, float exposure) {
+    vec3 paperReferred709 = max(hdr * exposure, vec3(0.0));
+    vec3 paperReferred2020 = max(CT_BT709_TO_BT2020 * paperReferred709, vec3(0.0));
+    vec3 mapped2020 = psychoTonemapBT2020(paperReferred2020, pc.headroom, true);
+    return ctPqEncodeNits(mapped2020 * pc.paperWhiteNits);
+}
+
+// ---------- SDR tonemappers ----------
+vec3 pbrNeutralTonemap(vec3 color) {
+    float startCompression = clamp(pc.sdrParam0, 0.0, 0.99);
+    float desaturation = max(pc.sdrParam1, 0.0);
+
+    color = max(color, vec3(0.0));
+    float x = min(color.r, min(color.g, color.b));
+    float offset = x < 0.08 ? x - 6.25 * x * x : 0.04;
+    color -= offset;
+
+    float peak = max(color.r, max(color.g, color.b));
+    if (peak < startCompression) {
+        return color;
+    }
+
+    float d = 1.0 - startCompression;
+    float newPeak = 1.0 - d * d / max(peak + d - startCompression, 1.0e-6);
+    color *= ctSafeDiv(newPeak, peak, 1.0);
+
+    float g = 1.0 - 1.0 / (desaturation * (peak - newPeak) + 1.0);
+    return mix(color, vec3(newPeak), g);
+}
+
+vec3 ctLuminanceTonemap(vec3 color, float lMapped, float lSource) {
+    return color * ctSafeDiv(lMapped, lSource, 1.0);
+}
+
+vec3 reinhardExtendedTonemap(vec3 color) {
+    float l = dot(color, CT_LUMA_BT709);
+    if (l < 1.0e-6) {
+        return color;
+    }
+    float lWhite = max(pc.sdrParam0, 1.0e-3);
+    float lWhite2 = lWhite * lWhite;
+    float lm = l * (1.0 + l / lWhite2) / (1.0 + l);
+    return ctLuminanceTonemap(color, clamp(lm, 0.0, 1.0), l);
+}
+
+vec3 acesHillTonemap(vec3 color) {
+    color *= max(pc.sdrParam0, 0.0);
+    float l = dot(color, CT_LUMA_BT709);
+    if (l < 1.0e-6) {
+        return color;
+    }
+    float lm = (l * (2.51 * l + 0.03)) / max(l * (2.43 * l + 0.59) + 0.14, 1.0e-6);
+    return ctLuminanceTonemap(color, clamp(lm, 0.0, 1.0), l);
+}
+
+vec3 lottesTonemap(vec3 color) {
+    float l = dot(color, CT_LUMA_BT709);
+    if (l < 1.0e-6) {
+        return color;
+    }
+
+    float a = max(pc.sdrParam0, 1.0e-3);
+    float d = max(pc.sdrParam1, 1.0e-3);
+    float hdrMax = max(pc.sdrParam2, 1.0e-3);
+    float midIn = max(pc.sdrParam3, 1.0e-3);
+    float midOut = max(pc.sdrParam4, 1.0e-3);
+    float hdrPow = pow(hdrMax, a * d);
+    float midPow = pow(midIn, a * d);
+    float denom = max((hdrPow - midPow) * midOut, 1.0e-6);
+    float b = (-pow(midIn, a) + pow(hdrMax, a) * midOut) / denom;
+    float c = (hdrPow * pow(midIn, a) - pow(hdrMax, a) * midPow * midOut) / denom;
+
+    float lm = pow(l, a) / max(pow(l, a * d) * b + c, 1.0e-6);
+    return ctLuminanceTonemap(color, clamp(lm, 0.0, 1.0), l);
+}
+
+vec3 frostbiteTonemap(vec3 color) {
+    float l = dot(color, CT_LUMA_BT709);
+    if (l < 1.0e-6) {
+        return color;
+    }
+
+    float linearEnd = clamp(pc.sdrParam0, 0.0, 1.0);
+    float shoulderStrength = max(pc.sdrParam1, 0.0);
+    float lm = l <= linearEnd
+        ? l
+        : linearEnd + (1.0 - linearEnd) * (1.0 - exp(-(l - linearEnd) * shoulderStrength));
+    return ctLuminanceTonemap(color, clamp(lm, 0.0, 1.0), l);
+}
+
+float ctHablePartial(float x, float a, float b, float c, float d, float e, float f) {
+    return ((x * (a * x + c * b) + d * e) / max(x * (a * x + b) + d * f, 1.0e-6)) - e / f;
+}
+
+vec3 uncharted2Tonemap(vec3 color) {
+    float l = dot(color, CT_LUMA_BT709);
+    if (l < 1.0e-6) {
+        return color;
+    }
+
+    float a = max(pc.sdrParam0, 1.0e-4);
+    float b = max(pc.sdrParam1, 1.0e-4);
+    float c = max(pc.sdrParam2, 0.0);
+    float d = max(pc.sdrParam3, 1.0e-4);
+    float e = max(pc.sdrParam4, 0.0);
+    float f = max(pc.sdrParam5, 1.0e-4);
+    float w = max(pc.sdrParam6, 1.0e-3);
+    float whiteScale = max(ctHablePartial(w, a, b, c, d, e, f), 1.0e-6);
+    float lm = ctHablePartial(l, a, b, c, d, e, f) / whiteScale;
+    return ctLuminanceTonemap(color, clamp(lm, 0.0, 1.0), l);
+}
+
+vec3 gtTonemap(vec3 color) {
+    float l = dot(color, CT_LUMA_BT709);
+    if (l < 1.0e-6) {
+        return color;
+    }
+
+    const float p = 1.0;
+    float a = max(pc.sdrParam0, 1.0e-3);
+    float m = clamp(pc.sdrParam1, 1.0e-4, 0.99);
+    float linearLength = max(pc.sdrParam2, 1.0e-4);
+    float c = max(pc.sdrParam3, 1.0e-4);
+    float b = pc.sdrParam4;
+
+    float l0 = ((p - m) * linearLength) / a;
+    float s0 = m + l0;
+    float s1 = m + a * l0;
+    float c2 = (a * p) / max(p - s1, 1.0e-6);
+    float cp = -c2 / p;
+
+    float w0 = 1.0 - smoothstep(0.0, m, l);
+    float w2 = step(m + l0, l);
+    float w1 = 1.0 - w0 - w2;
+
+    float toe = m * pow(max(l / m, 0.0), c) + b;
+    float shoulder = p - (p - s1) * exp(cp * (l - s0));
+    float lm = toe * w0 + l * w1 + shoulder * w2;
+    return ctLuminanceTonemap(color, clamp(lm, 0.0, 1.0), l);
+}
+
+vec3 tonemapSdrPsychoV(vec3 color) {
+    vec3 color2020 = max(CT_BT709_TO_BT2020 * color, vec3(0.0));
+    vec3 mapped2020 = psychoTonemapBT2020(color2020, max(pc.sdrPsychoPeak, 1.0), false);
+    vec3 mapped709 = CT_BT2020_TO_BT709 * mapped2020;
+    float luma = clamp(dot(mapped709, CT_LUMA_BT709), 0.0, 1.0);
+    vec3 chroma = mapped709 - vec3(luma);
+    float scale = 1.0;
+    for (int i = 0; i < 3; ++i) {
+        if (chroma[i] < 0.0) {
+            scale = min(scale, luma / -chroma[i]);
+        } else if (chroma[i] > 0.0) {
+            scale = min(scale, (1.0 - luma) / chroma[i]);
+        }
+    }
+    return clamp(vec3(luma) + chroma * clamp(scale, 0.0, 1.0), 0.0, 1.0);
+}
+
+// ---------- PsychoV23 ----------
+const float PSYCHO23_EPSILON = 1.0e-6;
+const float PSYCHO23_REFERENCE_SIMULTANEOUS_RANGE_LOG10 = 3.7;
+const float PSYCHO23_REFERENCE_CENTERED_RANGE_SIDE_COUNT = 2.0;
+const float PSYCHO23_HIGHLIGHT_GRADE_REFERENCE_WHITE = 1.0;
+const float PSYCHO23_SHADOW_GRADE_RANGE_STOPS = 4.0;
+const float PSYCHO23_RED_RETENTION = 1.5;
+const float PSYCHO23_GREEN_RETENTION = 2.0;
+const float PSYCHO23_BLUE_RETENTION = 1.0;
+const float PSYCHO23_YELLOW_RETENTION = 3.0;
+
+float psycho23YfFromLMS(vec3 lms) {
+    vec3 weighted = lms * PSYCHO_MB_WEIGHTS;
+    return max(weighted.x + weighted.y, PSYCHO23_EPSILON);
+}
+
+float psycho23QuinticUnitRamp(float t) {
+    t = clamp(t, 0.0, 1.0);
+    return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+}
+
+float psycho23HighlightsScalarV4(float x, float highlights, float adaptedAnchorYf) {
+    if (highlights == 1.0) {
+        return x;
+    }
+
+    float t = 0.0;
+    if (x > adaptedAnchorYf) {
+        float referenceRangeLog2 = log2(PSYCHO23_HIGHLIGHT_GRADE_REFERENCE_WHITE
+                / max(adaptedAnchorYf, PSYCHO23_EPSILON));
+        t = clamp(log2(x / max(adaptedAnchorYf, PSYCHO23_EPSILON))
+                / max(referenceRangeLog2, PSYCHO23_EPSILON), 0.0, 1.0);
+    }
+    t = psycho23QuinticUnitRamp(t);
+
+    float ratio = max(x / max(adaptedAnchorYf, PSYCHO23_EPSILON), PSYCHO23_EPSILON);
+    if (highlights > 1.0) {
+        return mix(x, adaptedAnchorYf * pow(ratio, highlights), t);
+    }
+
+    float b = adaptedAnchorYf * pow(ratio, 2.0 - highlights);
+    return ctSafeDiv(x * x, mix(x, b, t), x);
+}
+
+float psycho23ShadowsScalarV4(float x, float shadows, float adaptedAnchorYf) {
+    if (shadows == 1.0) {
+        return x;
+    }
+
+    float ratio = max(ctSafeDiv(x, adaptedAnchorYf, 0.0), 0.0);
+    float baseTerm = x * adaptedAnchorYf;
+    float baseScale = ctSafeDiv(baseTerm, ratio, 0.0);
+    float shadowFloor = adaptedAnchorYf * exp2(-PSYCHO23_SHADOW_GRADE_RANGE_STOPS);
+
+    float t = 1.0;
+    if (x > shadowFloor) {
+        t = clamp(log2(x / max(adaptedAnchorYf, PSYCHO23_EPSILON))
+                / log2(shadowFloor / max(adaptedAnchorYf, PSYCHO23_EPSILON)), 0.0, 1.0);
+    }
+    t = psycho23QuinticUnitRamp(t);
+
+    if (shadows > 1.0) {
+        float raised = x * (1.0 + ctSafeDiv(baseTerm,
+                pow(max(ratio, PSYCHO23_EPSILON), shadows), 0.0));
+        float reference = x * (1.0 + baseScale);
+        return x + (raised - reference) * t;
+    }
+
+    float lowered = x * (1.0 - ctSafeDiv(baseTerm,
+            pow(max(ratio, PSYCHO23_EPSILON), 2.0 - shadows), 0.0));
+    float reference = x * (1.0 - baseScale);
+    return x + (lowered - reference) * t;
+}
+
+float psycho23AutoCompression(float anchorOutYf, float peakYf) {
+    float peakOverAnchor = ctSafeDiv(max(peakYf, PSYCHO23_EPSILON),
+            max(anchorOutYf, PSYCHO23_EPSILON), 1.0);
+    peakOverAnchor = max(peakOverAnchor, 1.0 + PSYCHO23_EPSILON);
+    float referenceOneSideRangeLog10 = PSYCHO23_REFERENCE_SIMULTANEOUS_RANGE_LOG10
+            / PSYCHO23_REFERENCE_CENTERED_RANGE_SIDE_COUNT;
+    float actualAboveAdaptationRangeLog10 = max(log(peakOverAnchor) / log(10.0), PSYCHO23_EPSILON);
+    return max(referenceOneSideRangeLog10 / actualAboveAdaptationRangeLog10, 1.0);
+}
+
+vec3 psycho23ToAdaptiveRelativeWeightedLMS(vec3 lmsInput, vec3 adaptiveStateLms) {
+    return (lmsInput * PSYCHO_MB_WEIGHTS) / max(adaptiveStateLms, vec3(PSYCHO23_EPSILON));
+}
+
+vec3 psycho23FromAdaptiveRelativeWeightedLMS(vec3 lmsWeightedRelative, vec3 adaptiveStateLms) {
+    return lmsWeightedRelative * max(adaptiveStateLms, vec3(PSYCHO23_EPSILON));
+}
+
+vec3 psycho23MBFromWeighted(vec3 weightedLms) {
+    float y = weightedLms.x + weightedLms.y;
+    if (y <= PSYCHO23_EPSILON) {
+        return vec3(0.0);
+    }
+    return vec3(weightedLms.x / y, weightedLms.z / y, y);
+}
+
+vec3 psycho23WeightedFromMB(vec3 mb) {
+    return vec3(mb.x, 1.0 - mb.x, mb.y) * mb.z;
+}
+
+vec3 psycho23UnweighLMS(vec3 weightedLms) {
+    return weightedLms / max(PSYCHO_MB_WEIGHTS, vec3(PSYCHO23_EPSILON));
+}
+
+vec3 psycho23AdaptiveRelativeWeightedNeutral() {
+    return PSYCHO_MB_WEIGHTS;
+}
+
+vec3 psycho23OpponentACCFromWeightedDelta(vec3 deltaWeightedLms) {
+    vec3 neutralWeighted = psycho23AdaptiveRelativeWeightedNeutral();
+    float mToL = ctSafeDiv(neutralWeighted.x, neutralWeighted.y, 0.0);
+    float sToLm = ctSafeDiv(neutralWeighted.x + neutralWeighted.y, neutralWeighted.z, 0.0);
+    return vec3(deltaWeightedLms.x + deltaWeightedLms.y,
+            deltaWeightedLms.x - mToL * deltaWeightedLms.y,
+            -deltaWeightedLms.x - deltaWeightedLms.y + sToLm * deltaWeightedLms.z);
+}
+
+vec3 psycho23WeightedDeltaFromOpponentACC(vec3 acc) {
+    vec3 neutralWeighted = psycho23AdaptiveRelativeWeightedNeutral();
+    float mToL = ctSafeDiv(neutralWeighted.x, neutralWeighted.y, 0.0);
+    float sToLm = ctSafeDiv(neutralWeighted.x + neutralWeighted.y, neutralWeighted.z, 0.0);
+    float deltaM = ctSafeDiv(acc.x - acc.y, 1.0 + mToL, 0.0);
+    float deltaL = acc.x - deltaM;
+    float deltaS = ctSafeDiv(acc.z + acc.x, sToLm, 0.0);
+    return vec3(deltaL, deltaM, deltaS);
+}
+
+float psycho23CompressionProgressFromYf(vec3 contrastLms, vec3 anchorOut,
+        vec3 peakLms, float compressionPower) {
+    float contrastYf = psycho23YfFromLMS(contrastLms);
+    float anchorYf = psycho23YfFromLMS(anchorOut);
+    float peakYf = psycho23YfFromLMS(peakLms);
+    float anchorOverPeak = ctSafeDiv(anchorYf, peakYf, 1.0);
+    float slopeNormalization = 1.0 - pow(max(anchorOverPeak, PSYCHO23_EPSILON), compressionPower);
+    float u = pow(max(ctSafeDiv(contrastYf, anchorYf, 1.0), PSYCHO23_EPSILON),
+            compressionPower / max(slopeNormalization, PSYCHO23_EPSILON));
+    float whiteOffset = pow(max(ctSafeDiv(peakYf, anchorYf, 1.0), PSYCHO23_EPSILON),
+            compressionPower) - 1.0;
+    return clamp((u - 1.0) / max(u + whiteOffset, PSYCHO23_EPSILON), 0.0, 1.0);
+}
+
+float psycho23SignedOpponentRetention(float whiteProgress, float retentionExponent) {
+    return 1.0 - pow(clamp(whiteProgress, 0.0, 1.0),
+            max(retentionExponent, PSYCHO23_EPSILON));
+}
+
+vec3 psycho23ApplySignedOpponentRetention(vec3 compressedLms, vec3 sourceLms,
+        vec3 adaptiveStateLms, vec3 peakLms, float whiteProgress) {
+    if (whiteProgress <= 0.0 || min(sourceLms.x, min(sourceLms.y, sourceLms.z)) <= 0.0) {
+        return compressedLms;
+    }
+
+    vec3 sourceWeighted = psycho23ToAdaptiveRelativeWeightedLMS(sourceLms, adaptiveStateLms);
+    vec3 adaptedNeutral = psycho23AdaptiveRelativeWeightedNeutral();
+    float adaptedNeutralYf = adaptedNeutral.x + adaptedNeutral.y;
+    float sourceYf = sourceWeighted.x + sourceWeighted.y;
+    if (sourceYf <= PSYCHO23_EPSILON || adaptedNeutralYf <= PSYCHO23_EPSILON) {
+        return compressedLms;
+    }
+
+    vec3 sourceNeutral = adaptedNeutral * ctSafeDiv(sourceYf, adaptedNeutralYf, 1.0);
+    vec3 sourceDelta = sourceWeighted - sourceNeutral;
+    vec3 sourceAcc = psycho23OpponentACCFromWeightedDelta(sourceDelta) / sourceYf;
+
+    float redRetention = psycho23SignedOpponentRetention(whiteProgress, PSYCHO23_RED_RETENTION);
+    float greenRetention = psycho23SignedOpponentRetention(whiteProgress, PSYCHO23_GREEN_RETENTION);
+    float blueRetention = psycho23SignedOpponentRetention(whiteProgress, PSYCHO23_BLUE_RETENTION);
+    float yellowRetention = psycho23SignedOpponentRetention(whiteProgress, PSYCHO23_YELLOW_RETENTION);
+    
+    float rgOut = max(sourceAcc.y, 0.0) * redRetention
+            - max(-sourceAcc.y, 0.0) * greenRetention;
+    float yvOut = max(sourceAcc.z, 0.0) * blueRetention
+            - max(-sourceAcc.z, 0.0) * yellowRetention;
+
+    vec3 compressedWeighted = psycho23ToAdaptiveRelativeWeightedLMS(compressedLms, adaptiveStateLms);
+    float targetYf = compressedWeighted.x + compressedWeighted.y;
+    if (targetYf <= PSYCHO23_EPSILON) {
+        return compressedLms;
+    }
+
+    vec3 peakWeighted = psycho23ToAdaptiveRelativeWeightedLMS(peakLms, adaptiveStateLms);
+    float peakWeightedYf = peakWeighted.x + peakWeighted.y;
+    if (peakWeightedYf <= PSYCHO23_EPSILON) {
+        return compressedLms;
+    }
+
+    vec3 targetNeutral = peakWeighted * ctSafeDiv(targetYf, peakWeightedYf, 1.0);
+    vec3 targetDelta = psycho23WeightedDeltaFromOpponentACC(
+            vec3(0.0, rgOut * targetYf, yvOut * targetYf));
+    vec3 outputWeighted = targetNeutral + targetDelta;
+    vec3 outputLms = psycho23UnweighLMS(
+            psycho23FromAdaptiveRelativeWeightedLMS(outputWeighted, adaptiveStateLms));
+
+    float compressedYf = psycho23YfFromLMS(compressedLms);
+    float outputYf = psycho23YfFromLMS(outputLms);
+    if (outputYf <= PSYCHO23_EPSILON) {
+        return compressedLms;
+    }
+    return outputLms * ctSafeDiv(compressedYf, outputYf, 1.0);
+}
+
+vec3 psycho23ApplyAdaptiveMBPurity(vec3 lmsInput, vec3 adaptiveNeutralLms,
+        float purityDelta) {
+    if (abs(purityDelta - 1.0) <= 1.0e-5) {
+        return lmsInput;
+    }
+
+    vec3 relativeWeighted = psycho23ToAdaptiveRelativeWeightedLMS(lmsInput, adaptiveNeutralLms);
+    vec3 mb = psycho23MBFromWeighted(relativeWeighted);
+    vec3 mbNeutral = psycho23MBFromWeighted(vec3(1.0) * PSYCHO_MB_WEIGHTS);
+    vec2 mbScaledXy = mix(mbNeutral.xy, mb.xy, purityDelta);
+    vec3 relativeWeightedOut = psycho23WeightedFromMB(vec3(mbScaledXy, mb.z));
+    return psycho23UnweighLMS(
+            psycho23FromAdaptiveRelativeWeightedLMS(relativeWeightedOut, adaptiveNeutralLms));
+}
+
+vec3 psycho23GamutCompressAdaptive(vec3 relativeWeighted, vec3 adaptiveStateLms, float strength) {
+    if (strength == 0.0) {
+        return relativeWeighted;
+    }
+
+    vec3 weightedAbsolute = psycho23FromAdaptiveRelativeWeightedLMS(relativeWeighted, adaptiveStateLms);
+    vec3 absoluteLms = psycho23UnweighLMS(weightedAbsolute);
+    vec3 compressedLms = psychoGamutCompress(absoluteLms);
+    vec3 compressedRelative = (compressedLms * PSYCHO_MB_WEIGHTS)
+            / max(adaptiveStateLms, vec3(PSYCHO23_EPSILON));
+    return mix(relativeWeighted, compressedRelative, clamp(strength, 0.0, 1.0));
+}
+
+vec3 psycho23LMSFromBT709(vec3 bt709) {
+    return psychoLMSFromBT2020(CT_BT709_TO_BT2020 * bt709);
+}
+
+vec3 psycho23BT709FromLMS(vec3 lms) {
+    return CT_BT2020_TO_BT709 * psychoBT2020FromLMS(lms);
+}
+
+vec3 psycho23CopySign(vec3 magnitude, vec3 source) {
+    return vec3(source.x < 0.0 ? -abs(magnitude.x) : abs(magnitude.x),
+            source.y < 0.0 ? -abs(magnitude.y) : abs(magnitude.y),
+            source.z < 0.0 ? -abs(magnitude.z) : abs(magnitude.z));
+}
+
+vec3 psychoV23Linear(vec3 color, float peakValue, float highlights, float shadows,
+        float contrast, float purityScale, float hueRestore, float adaptationContrast,
+        float coneResponseExponent, float compression, float gamutCompression) {
+    float legacyResponseScale = max(coneResponseExponent * adaptationContrast, 0.0);
+    contrast *= legacyResponseScale;
+    purityScale *= legacyResponseScale;
+
+    vec3 lmsIn = psycho23LMSFromBT709(color);
+    vec3 lmsPeak = psycho23LMSFromBT709(vec3(peakValue));
+    vec3 adaptiveStateLms = psycho23LMSFromBT709(vec3(0.18));
+    vec3 desiredBackgroundStateLms = adaptiveStateLms;
+    vec3 anchorIn = max(adaptiveStateLms, vec3(PSYCHO23_EPSILON));
+    vec3 anchorOut = max(desiredBackgroundStateLms, vec3(PSYCHO23_EPSILON));
+
+    vec3 gradedLms = abs(lmsIn);
+    float gradedYf = psycho23YfFromLMS(gradedLms);
+    float adaptedAnchorYf = psycho23YfFromLMS(anchorIn);
+    float gradedYfOut = psycho23HighlightsScalarV4(gradedYf, highlights, adaptedAnchorYf);
+    gradedYfOut = psycho23ShadowsScalarV4(gradedYfOut, shadows, adaptedAnchorYf);
+    gradedLms *= ctSafeDiv(gradedYfOut, gradedYf, 1.0);
+
+    float contrastPower = max(contrast, PSYCHO23_EPSILON);
+    float purityDelta = ctSafeDiv(max(purityScale, PSYCHO23_EPSILON), contrastPower, 1.0);
+    vec3 contrastInput = psycho23ApplyAdaptiveMBPurity(gradedLms, anchorIn, purityDelta);
+    vec3 contrastRatio = max(contrastInput / anchorIn, vec3(PSYCHO23_EPSILON));
+    vec3 contrastLms = anchorOut * pow(contrastRatio, vec3(contrastPower));
+
+    float compressionPower = compression;
+    if (compression <= PSYCHO23_EPSILON) {
+        compressionPower = psycho23AutoCompression(
+                psycho23YfFromLMS(anchorOut), psycho23YfFromLMS(lmsPeak));
+    }
+    compressionPower = max(compressionPower, PSYCHO23_EPSILON);
+    vec3 anchorOverPeak = anchorOut / max(lmsPeak, vec3(PSYCHO23_EPSILON));
+    vec3 compressionSlopeNorm = 1.0
+            - pow(max(anchorOverPeak, vec3(PSYCHO23_EPSILON)), vec3(compressionPower));
+    vec3 compressionInput = pow(max(contrastLms / anchorOut, vec3(PSYCHO23_EPSILON)),
+            vec3(compressionPower) / max(compressionSlopeNorm, vec3(PSYCHO23_EPSILON)));
+    vec3 compressionWhiteOffset = pow(max(lmsPeak / anchorOut, vec3(PSYCHO23_EPSILON)),
+            vec3(compressionPower)) - vec3(1.0);
+    vec3 compressedLms = lmsPeak * pow(
+            compressionInput / max(compressionInput + compressionWhiteOffset,
+                    vec3(PSYCHO23_EPSILON)), vec3(1.0 / compressionPower));
+
+    float whiteProgress = psycho23CompressionProgressFromYf(
+            contrastLms, anchorOut, lmsPeak, compressionPower);
+    vec3 opponentRetainedLms = psycho23ApplySignedOpponentRetention(
+            compressedLms, contrastLms, adaptiveStateLms, lmsPeak, whiteProgress);
+    vec3 hueRestoredLms = mix(compressedLms, opponentRetainedLms, clamp(hueRestore, 0.0, 1.0));
+    vec3 displayScaled = psycho23CopySign(hueRestoredLms, lmsIn);
+    vec3 displayScaledRelativeWeighted = psycho23ToAdaptiveRelativeWeightedLMS(
+            displayScaled, adaptiveStateLms);
+    displayScaledRelativeWeighted = psycho23GamutCompressAdaptive(
+            displayScaledRelativeWeighted, adaptiveStateLms, gamutCompression);
+
+    vec3 outputLms = psycho23UnweighLMS(
+            psycho23FromAdaptiveRelativeWeightedLMS(displayScaledRelativeWeighted, adaptiveStateLms));
+    return psycho23BT709FromLMS(outputLms);
+}
+
+vec3 tonemapSdrPsychoV23(vec3 color) {
+    return clamp(psychoV23Linear(color, max(pc.sdrPsychoV23Peak, 0.25),
+            pc.psychoHighlights, pc.psychoShadows, pc.psychoContrast, pc.psychoPurity,
+            pc.psychoHueRestore, pc.psychoAdaptContrast, pc.psychoConeExponent,
+            pc.sdrPsychoV23Compression, pc.sdrPsychoV23GamutCompression), 0.0, 1.0);
+}
+
+vec3 tonemapHdrPsychoV23(vec3 hdr, float exposure) {
+    vec3 paperReferred709 = max(hdr * exposure, vec3(0.0));
+    vec3 mapped709 = max(psychoV23Linear(paperReferred709, max(pc.headroom, 1.0),
+            pc.psychoHighlights, pc.psychoShadows, pc.psychoContrast, pc.psychoPurity,
+            pc.psychoHueRestore, pc.psychoAdaptContrast, pc.psychoConeExponent,
+            pc.hdrPsychoV23Compression, pc.hdrPsychoV23GamutCompression), vec3(0.0));
+    vec3 mapped2020 = max(CT_BT709_TO_BT2020 * mapped709, vec3(0.0));
+    return ctPqEncodeNits(mapped2020 * pc.paperWhiteNits);
+}
+
+// ---------- Dispatcher SDR (sama persis dengan tonemapSdr Caustica) ----------
+#ifndef CT_DISPATCHERS_DEFINED
+#define CT_DISPATCHERS_DEFINED
+
+vec3 ctTonemapSdr(vec3 hdr, float exposure) {
+    vec3 color = max(hdr * exposure, vec3(0.0));
+    vec3 mapped;
+    if (pc.sdrTonemapMode == SDR_TONEMAP_AGX) {
+        return ctApplyContrastSaturation(ctAgx(color), pc.sdrParam0, pc.sdrParam1);
+    } else if (pc.sdrTonemapMode == SDR_TONEMAP_PBR_NEUTRAL) {
+        mapped = pbrNeutralTonemap(color);
+    } else if (pc.sdrTonemapMode == SDR_TONEMAP_REINHARD) {
+        mapped = reinhardExtendedTonemap(color);
+    } else if (pc.sdrTonemapMode == SDR_TONEMAP_ACES) {
+        mapped = acesHillTonemap(color);
+    } else if (pc.sdrTonemapMode == SDR_TONEMAP_LOTTES) {
+        mapped = lottesTonemap(color);
+    } else if (pc.sdrTonemapMode == SDR_TONEMAP_FROSTBITE) {
+        mapped = frostbiteTonemap(color);
+    } else if (pc.sdrTonemapMode == SDR_TONEMAP_UNCHARTED2) {
+        mapped = uncharted2Tonemap(color);
+    } else if (pc.sdrTonemapMode == SDR_TONEMAP_GT) {
+        mapped = gtTonemap(color);
+    } else if (pc.sdrTonemapMode == SDR_TONEMAP_PSYCHOV) {
+        mapped = tonemapSdrPsychoV(color);
+    } else if (pc.sdrTonemapMode == SDR_TONEMAP_PSYCHOV23) {
+        mapped = tonemapSdrPsychoV23(color);
+    } else {
+        return ctApplyContrastSaturation(ctAgx(color), pc.sdrParam0, pc.sdrParam1);
+    }
+    return ctLinearToSrgb(mapped);
+}
+
+// Dispatcher HDR Caustica (output PQ/HDR10). Iris tidak punya swapchain HDR,
+// jadi fungsi ini disertakan untuk kelengkapan tetapi TIDAK dipanggil.
+vec3 ctTonemapHdr(vec3 hdr, float exposure) {
+    if (pc.hdrTonemapMode == HDR_TONEMAP_CAUSTICA) {
+        return tonemapHdrCaustica(hdr, exposure);
+    }
+    if (pc.hdrTonemapMode == HDR_TONEMAP_PSYCHOV23) {
+        return tonemapHdrPsychoV23(hdr, exposure);
+    }
+    if (pc.hdrTonemapMode == HDR_TONEMAP_PSYCHOV) {
+        return tonemapHdrPsychoV(hdr, exposure);
+    }
+    return tonemapHdrEetf(hdr, exposure);
+}
+
+#endif // CT_DISPATCHERS_DEFINED
+
+// ---------- Pengisi parameter (nilai default dari CausticaConfig.java) ----------
+#define CAUSTICA_SDR_MODE (TONEMAP_OPERATOR - 1)
+
+void causticaInitParams() {
+    pc.hdrEnabled     = 0;
+    pc.hdrTonemapMode = HDR_TONEMAP_PSYCHOV23;
+    pc.sdrTonemapMode = CAUSTICA_SDR_MODE;
+    pc.paperWhiteNits = 200.0;
+    pc.headroom       = 5.0;
+    pc.debugView      = 0;
+
+    pc.psychoHighlights    = CT_PSY_HIGHLIGHTS;
+    pc.psychoShadows       = CT_PSY_SHADOWS;
+    pc.psychoContrast      = CT_PSY_CONTRAST;
+    pc.psychoPurity        = CT_PSY_PURITY;
+    pc.psychoBleaching     = CT_PSY_BLEACHING;
+    pc.psychoHueRestore    = CT_PSY_HUE_RESTORE;
+    pc.psychoAdaptContrast = CT_PSY_ADAPT_CONTRAST;
+    pc.psychoClipPoint     = CT_PSY_CLIP_POINT;
+    pc.psychoWhiteCurve    = float(CT_PSY_WHITE_CURVE);
+    pc.psychoConeExponent  = CT_PSY_CONE_EXPONENT;
+    pc.sdrPsychoPeak       = CT_PSYV_PEAK;
+
+    pc.sdrPsychoV23Peak             = CT_V23_PEAK;
+    pc.sdrPsychoV23Compression      = CT_V23_COMPRESSION;
+    pc.sdrPsychoV23GamutCompression = CT_V23_GAMUT;
+    pc.hdrPsychoV23Compression      = CT_V23_COMPRESSION;
+    pc.hdrPsychoV23GamutCompression = CT_V23_GAMUT;
+
+    pc.sdrParam0 = 0.0; pc.sdrParam1 = 0.0; pc.sdrParam2 = 0.0; pc.sdrParam3 = 0.0;
+    pc.sdrParam4 = 0.0; pc.sdrParam5 = 0.0; pc.sdrParam6 = 0.0; pc.sdrParam7 = 0.0;
+
+#if   CAUSTICA_SDR_MODE == 0   // PBR Neutral: startCompression, desaturation
+    pc.sdrParam0 = 0.76; pc.sdrParam1 = 0.15;
+#elif CAUSTICA_SDR_MODE == 1   // Reinhard: white point
+    pc.sdrParam0 = 4.0;
+#elif CAUSTICA_SDR_MODE == 2   // ACES: exposure
+    pc.sdrParam0 = 1.0;
+#elif CAUSTICA_SDR_MODE == 3   // AgX: contrast, saturation
+    pc.sdrParam0 = 1.0; pc.sdrParam1 = 1.0;
+#elif CAUSTICA_SDR_MODE == 4   // Lottes: contrast, shoulder, hdrMax, midIn, midOut
+    pc.sdrParam0 = 2.0; pc.sdrParam1 = 1.0; pc.sdrParam2 = 16.0;
+    pc.sdrParam3 = 0.18; pc.sdrParam4 = 0.18;
+#elif CAUSTICA_SDR_MODE == 5   // Frostbite: linearEnd, shoulderStrength
+    pc.sdrParam0 = 0.25; pc.sdrParam1 = 2.0;
+#elif CAUSTICA_SDR_MODE == 6   // Uncharted 2: A, B, C, D, E, F, whitePoint
+    pc.sdrParam0 = 0.15; pc.sdrParam1 = 0.50; pc.sdrParam2 = 0.10;
+    pc.sdrParam3 = 0.20; pc.sdrParam4 = 0.02; pc.sdrParam5 = 0.30;
+    pc.sdrParam6 = 11.2;
+#elif CAUSTICA_SDR_MODE == 7   // GT: contrast, linearStart, linearLength, blackCurve, blackLift
+    pc.sdrParam0 = 1.0; pc.sdrParam1 = 0.22; pc.sdrParam2 = 0.4;
+    pc.sdrParam3 = 1.33; pc.sdrParam4 = 0.0;
+#endif
+    // PsychoV (8) dan PsychoV23 (9) tidak memakai sdrParam (sama seperti Caustica).
+}
+
+#endif
