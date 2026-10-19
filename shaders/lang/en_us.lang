@@ -1,0 +1,496 @@
+profile.FANCY = §9Fancy
+profile.FAST  = §cFast
+
+option.MAIN_TITLE = Zephyr Starlight by §9Kirilpro6284
+
+value.MAIN_TITLE.0 = §dv0.2.2
+value.MAIN_TITLE.1 = §cv0.2.2
+value.MAIN_TITLE.2 = §6v0.2.2
+value.MAIN_TITLE.3 = §ev0.2.2
+value.MAIN_TITLE.4 = §av0.2.2
+value.MAIN_TITLE.5 = §bv0.2.2
+value.MAIN_TITLE.6 = §9v0.2.2
+value.MAIN_TITLE.7 = §5v0.2.2
+
+screen.PATH_TRACING    = Path Tracing
+screen.ATMOSPHERICS    = Atmosphere & Lighting
+screen.TERRAIN         = Terrain
+screen.ANTIALIASING    = Anti-Aliasing
+screen.POST_PROCESSING = Post Processing
+screen.MISC            = Misc / Debug
+
+screen.PT_VOXELIZATION = Voxelization
+screen.PT_IRCACHE      = Irradiance Cache
+
+screen.PT_DIFFUSE    = Diffuse Lighting
+screen.PT_REFLECTION = Reflections
+screen.PT_SHADOW     = Shadows
+screen.PT_DENOISING  = Denoiser
+
+screen.PT_SPATIAL_FILTER  = Spatial Filter
+screen.PT_TEMPORAL_FILTER = Temporal Filter
+
+option.SMOOTH_IRCACHE    = Smooth Irradiance Cache
+option.NOISE_METHOD      = Noise Method
+
+value.SMOOTH_IRCACHE.0 = Off
+value.SMOOTH_IRCACHE.1 = Fast
+value.SMOOTH_IRCACHE.2 = Fancy
+
+value.NOISE_METHOD.0 = White Noise
+value.NOISE_METHOD.1 = Blue Noise
+
+option.DIFFUSE_SAMPLES               = Diffuse Samples
+option.DIFFUSE_MAX_RT_DISTANCE       = Diffuse Trace Distance
+option.PT_DIFFUSE_ACCUMULATION_LIMIT = Max Accumulated Frames
+option.DIFFUSE_DENOISE_PASSES        = Denoising Passes
+option.SAMPLING_METHOD               = Sampling Method
+
+value.SAMPLING_METHOD.0              = Uniform
+value.SAMPLING_METHOD.1              = Cosine Weighted
+
+option.SECONDARY_GI_BRIGHTNESS       = Secondary GI Intensity
+option.MINIMUM_LIGHT                 = Minimum Light
+option.SUNLIGHT_GI_QUALITY           = Sunlight GI Quality
+
+value.SUNLIGHT_GI_QUALITY.0          = Low
+value.SUNLIGHT_GI_QUALITY.1          = Medium
+value.SUNLIGHT_GI_QUALITY.2          = High
+
+option.DIFFUSE_FILTER_QUALITY        = Denoiser Quality
+
+value.DIFFUSE_FILTER_QUALITY.0       = Low
+value.DIFFUSE_FILTER_QUALITY.1       = High
+
+option.REFLECTION_SAMPLES               = Reflection Samples
+option.REFLECTION_MAX_RT_DISTANCE       = Reflection Trace Distance
+option.PT_REFLECTION_ACCUMULATION_LIMIT = Max Accumulated Frames
+option.REFLECTION_ROUGHNESS_THRESHOLD   = Reflection Roughness Threshold
+option.REFLECTION_BOUNCES               = Reflection Bounces
+option.REFLECTION_PER_PIXEL_SHADOWS     = Per Pixel Shadow Calculation
+option.REFLECTION_SS_REUSE              = Screen Space Reuse
+
+option.SHADOW_SAMPLES               = Shadow Samples
+option.SHADOW_MAX_RT_DISTANCE       = Shadow Trace Distance
+option.PT_SHADOW_ACCUMULATION_LIMIT = Max Accumulated Frames
+option.SHADOW_SOFTNESS              = Shadow Softness
+option.SHADOW_SKIP_CLIPPING         = Skip Clipping
+
+option.DIFFUSE_HALF_RES    = Half Res Trace
+option.REFLECTION_HALF_RES = Half Res Trace
+option.SHADOW_HALF_RES     = Half Res Trace
+
+option.DENOISER_DEPTH_WEIGHT     = Denoiser Depth Weight
+option.DENOISER_NORMAL_WEIGHT    = Denoiser Normal Weight
+option.DENOISER_INTENSITY_WEIGHT = Denoiser Intensity Weight
+
+option.TEMPORAL_PREFILTERING      = Temporal Prefiltering
+option.TEMPORAL_NORMAL_TOLERANCE  = Temporal Normal Tolerance
+
+option.DENOISER_VARIANCE_GUIDE    = Variance Guide
+
+option.IRCACHE_VOXEL_ARRAY_SIZE = Voxel Array Size
+option.IRCACHE_PROBE_ATTEMPTS   = Probe Attempts
+option.IRCACHE_CASCADE_RES      = Cascade Resolution
+option.IRCACHE_MAX_RT_DISTANCE  = Trace Distance
+option.IRCACHE_SAMPLES          = Samples
+option.IRCACHE_BLEND_WEIGHT     = Blend Weight
+
+suffix.IRCACHE_CASCADE_RES      = ³
+
+option.VOXELIZATION_DISTANCE   = Voxelization Distance
+option.entityShadowDistanceMul = Entity Voxelization Distance Multiplier
+
+suffix.entityShadowDistanceMul = x
+
+option.VOXELIZE_ENTITIES       = Voxelize Entities
+option.VOXELIZE_BLOCK_ENTITIES = Voxelize Block Entities
+option.VOXELIZE_PLAYER         = Voxelize Player
+option.VOXELIZE_ITEMS          = Voxelize Items
+
+screen.VOXEL_ADVANCED = Advanced
+
+option.VOXEL_ARRAY_SIZE     = Voxel Array Size
+option.VOXEL_PROBE_ATTEMPTS = Voxel Probe Attempts
+option.shadowMapResolution  = Max Entity Texture Size
+suffix.shadowMapResolution  = ²
+option.TEXTURE_HASH_ENTRIES = Texture Hash Entries
+option.TRIANGLE_ARRAY_SIZE  = Triangle Array Size
+
+option.sunPathRotation      = Sun Path Rotation
+option.SUN_AZIMUTH_ROTATION = Sun Azimuth Rotation
+option.SUN_SIZE             = Sun Size
+
+option.SKY_MIE          = Mie Amount
+option.SKY_OZONE        = Ozone Amount
+option.SKY_RAYLEIGH_R   = Rayleigh Amount (R)
+option.SKY_RAYLEIGH_G   = Rayleigh Amount (G)
+option.SKY_RAYLEIGH_B   = Rayleigh Amount (B)
+option.NIGHT_BRIGHTNESS = Night Brightness
+option.SKY_MULTISCATTER = Multiple Scattering
+
+screen.VOLUMETRIC_LIGHT = Volumetric Light
+
+option.VL_ENABLED       = Enabled
+option.VL_STEP_COUNT    = Step Count
+option.VL_INTENSITY     = Intensity
+option.VL_INTENSITY_DAY = Intensity (Day)
+option.VL_DENSITY       = Fog Density
+option.VL_DISTANCE      = Max Distance
+
+screen.SUBSURFACE_SCATTERING = Subsurface Scattering
+
+option.SSS_ENABLED       = Enabled
+option.SSS_STEP_COUNT    = Step Count
+option.SSS_INTENSITY     = Intensity
+option.SSS_ABSORPTION    = Apsorption
+option.SSS_RADIUS        = Kernel Radius
+option.SSS_PHASE         = Phase Function
+
+option.VL_ENABLED       = Enabled
+option.VL_STEP_COUNT    = Step Count
+option.VL_INTENSITY     = Intensity
+option.VL_INTENSITY_DAY = Intensity (Day)
+option.VL_DENSITY       = Fog Density
+option.VL_DISTANCE      = Distance
+
+option.NORMAL_MAPPING         = Normal Mapping
+option.SPECULAR_MAPPING       = Specular Mapping
+option.GLASS_REFRACTION       = Glass Refraction
+option.WATER_REFRACTION       = Water Refraction
+option.REFRACTION_BOUNCES     = Refraction Bounces
+option.GLASS_IOR              = Index of Refraction
+option.GLASS_REFLECTANCE      = Glass Reflectance
+option.GLASS_OPACITY          = Glass Opacity
+option.WATER_ABSORPTION_R     = Water Absorption (R)
+option.WATER_ABSORPTION_G     = Water Absorption (G)
+option.WATER_ABSORPTION_B     = Water Absorption (B)
+option.WATER_REFLECTANCE      = Water Reflectance
+
+screen.TERRAIN_REFRACTION      = Refraction
+
+screen.TERRAIN_POM             = Parallax Occlusion Mapping
+
+option.POM                     = Enabled
+option.POM_DEPTH               = POM Depth
+option.POM_STEPS               = POM Steps
+option.POM_TEXTURE_RES         = Texture Resolution
+
+screen.TERRAIN_IPBR            = Integrated PBR
+
+option.IPBR                    = Hardcoded Specular
+option.EMISSION_BRIGHTNESS     = Emission Brightness
+option.GLOWING_ORES            = Glowing Ores
+option.GLOWING_CONCRETE_POWDER = Glowing Concrete Powder
+option.GLOWING_REDSTONE_BLOCK  = Glowing Redstone Block
+option.GLOWING_LAPIS_BLOCK     = Glowing Lapis Block
+option.GLOWING_ARMOR_TRIMS     = Glowing Armor Trims
+option.MIRROR_PACKED_ICE       = Mirror-Like Packed Ice
+
+screen.TERRAIN_WATER           = Water
+
+option.WATER_WAVE_HEIGHT       = Wave Height
+option.WATER_WAVE_FREQUENCY    = Wave Frequency
+option.WATER_WAVE_SPEED        = Wave Speed
+option.WATER_WAVE_TURBULENCE   = Wave Turbulence
+
+option.WATER_REFRACTED_CAUSTICS = Refracted Caustics
+option.WATER_REFLECTED_CAUSTICS = Reflected Caustics
+option.WATER_CAUSTICS_STRENGTH  = Caustic Strength
+
+option.TAA                     = TAA
+option.TAA_UPSCALING_FACTOR    = Temporal Upsampling
+
+value.TAA_UPSCALING_FACTOR.25  = 25% (Not recommended)
+value.TAA_UPSCALING_FACTOR.33  = 33% (Not recommended)
+value.TAA_UPSCALING_FACTOR.100 = 100% (Off)
+
+suffix.TAA_UPSCALING_FACTOR    = %
+
+option.TAA_JITTER_SCALE       = Jitter Scale
+option.TAA_BLEND_WEIGHT       = Blend Weight
+option.TAA_OFFCENTER_WEIGHT   = Offcenter Rejection
+option.TAA_VARIANCE_WEIGHT    = Variance Rejection
+option.TAA_MIP_SCALE          = Mip Scaling
+option.SHARPENING             = Sharpening Amount
+
+option.TAA_REFLECTION_DEPTH   = Reflection Reprojection
+option.TAA_HISTORY_SAMPLING   = History Sampling
+
+value.TAA_HISTORY_SAMPLING.0  = Catmull-Rom
+value.TAA_HISTORY_SAMPLING.1  = Bilinear
+
+option.DYNAMIC_EXPOSURE             = Dynamic Exposure
+option.ADAPTATION_SPEED             = Adaptation Speed
+option.MANUAL_EXPOSURE              = Manual Exposure
+option.BRIGHTNESS                   = Brightness
+option.CHROMATIC_ABERRATION         = Chromatic Aberration
+option.CHROMATIC_ABERRATION_SAMPLES = Chromatic Aberration Samples
+
+option.MOTION_BLUR                  = Motion Blur
+option.MOTION_BLUR_STRENGTH         = Motion Blur Strength
+option.MOTION_BLUR_SAMPLES          = Motion Blur Samples
+
+option.DEPTH_OF_FIELD               = Depth of Field
+option.APERTURE_SIZE                = DoF Aperture Size
+option.DOF_SAMPLES                  = DoF Samples
+option.DOF_FOCUS_MODE               = DoF Focus Mode
+option.DOF_FOCUS_DISTANCE           = Focus Distance
+
+option.BLOOM                        = Bloom
+option.BLOOM_STRENGTH               = Bloom Strength
+
+value.DOF_FOCUS_MODE.0              = Auto
+value.DOF_FOCUS_MODE.1              = Manual
+
+option.HAND_FOV               = Hand FOV
+option.DISABLE_DENOISING      = Disable Denoising
+option.FORCE_TRIANGLE_TRACING = Force Triangle Tracing
+
+value.HAND_FOV.0              = Default
+suffix.HAND_FOV               = °
+
+option.DEBUG_IRCACHE = View Irradiance Cache
+option.DEBUG_VOXELIZATION = View Voxelization
+
+
+option.TONEMAP_OPERATOR   = Tonemap
+value.TONEMAP_OPERATOR.0  = Zephyr (Default)
+value.TONEMAP_OPERATOR.1  = Caustica PBR Neutral
+value.TONEMAP_OPERATOR.2  = Caustica Reinhard
+value.TONEMAP_OPERATOR.3  = Caustica ACES
+value.TONEMAP_OPERATOR.4  = Caustica AgX
+value.TONEMAP_OPERATOR.5  = Caustica Lottes
+value.TONEMAP_OPERATOR.6  = Caustica Frostbite
+value.TONEMAP_OPERATOR.7  = Caustica Uncharted 2
+value.TONEMAP_OPERATOR.8  = Caustica GT
+value.TONEMAP_OPERATOR.9  = Caustica PsychoV
+value.TONEMAP_OPERATOR.10 = Caustica PsychoV23
+value.TONEMAP_OPERATOR.11 = §bOpenDRT
+
+screen.OPENDRT_SETTINGS         = OpenDRT Settings
+screen.OPENDRT_CUSTOM_LOOK      = Custom Look
+screen.OPENDRT_CUSTOM_TONESCALE = Custom Tonescale
+
+option.OPENDRT_PRESET=OpenDRT Preset
+value.OPENDRT_PRESET.opendrt_preset_default=Standard
+value.OPENDRT_PRESET.opendrt_preset_arriba=Arriba
+value.OPENDRT_PRESET.opendrt_preset_sylvan=Sylvan
+value.OPENDRT_PRESET.opendrt_preset_colorful=Colorful
+value.OPENDRT_PRESET.opendrt_preset_aery=Aery
+value.OPENDRT_PRESET.opendrt_preset_dystopic=Dystopic
+value.OPENDRT_PRESET.opendrt_preset_umbra=Umbra
+value.OPENDRT_PRESET.opendrt_preset_custom=§eCustom
+option.OPENDRT_TONESCALE_PRESET=OpenDRT Tonescale
+value.OPENDRT_TONESCALE_PRESET.opendrt_tonescale_optimized=Optimized
+value.OPENDRT_TONESCALE_PRESET.opendrt_tonescale_default=Default (ikut Preset)
+value.OPENDRT_TONESCALE_PRESET.opendrt_tonescale_low_contrast=Low Contrast
+value.OPENDRT_TONESCALE_PRESET.opendrt_tonescale_medium_contrast=Medium Contrast
+value.OPENDRT_TONESCALE_PRESET.opendrt_tonescale_high_contrast=High Contrast
+value.OPENDRT_TONESCALE_PRESET.opendrt_tonescale_arriba=Arriba
+value.OPENDRT_TONESCALE_PRESET.opendrt_tonescale_sylvan=Sylvan
+value.OPENDRT_TONESCALE_PRESET.opendrt_tonescale_colorful=Colorful
+value.OPENDRT_TONESCALE_PRESET.opendrt_tonescale_aery=Aery
+value.OPENDRT_TONESCALE_PRESET.opendrt_tonescale_dystopic=Dystopic
+value.OPENDRT_TONESCALE_PRESET.opendrt_tonescale_umbra=Umbra
+value.OPENDRT_TONESCALE_PRESET.opendrt_tonescale_aces_1x=ACES 1x
+value.OPENDRT_TONESCALE_PRESET.opendrt_tonescale_aces_2=ACES 2
+value.OPENDRT_TONESCALE_PRESET.opendrt_tonescale_marvelous=Marvelous
+value.OPENDRT_TONESCALE_PRESET.opendrt_tonescale_dagrinchi=Dagrinchi
+value.OPENDRT_TONESCALE_PRESET.opendrt_tonescale_custom=§eCustom
+option.OPENDRT_MIDDLE_GREY=OpenDRT Middle Grey
+suffix.OPENDRT_MIDDLE_GREY= nits
+option.OPENDRT_EXPOSURE=OpenDRT Exposure Scale
+suffix.OPENDRT_EXPOSURE=x
+
+option.ODC_SURROUND=Surround
+value.ODC_SURROUND.0=Dark (DCI)
+value.ODC_SURROUND.1=Dim (Rec.1886)
+value.ODC_SURROUND.2=Bright (sRGB)
+option.ODC_CWP=Creative White
+value.ODC_CWP.0=D93
+value.ODC_CWP.1=D75
+value.ODC_CWP.2=D65
+value.ODC_CWP.3=D60
+value.ODC_CWP.4=D55
+value.ODC_CWP.5=D50
+option.ODC_CWP_LM=Creative White Limit
+option.ODC_RS_SA=Render Space Strength
+option.ODC_PT_LML=Purity Limit Low
+option.ODC_PT_LMH=Purity Limit High
+option.ODC_PTM_LOW=Mid Purity Low
+option.ODC_PTM_HIGH=Mid Purity High
+option.ODC_BRL=Brilliance
+option.ODC_BRLP=Post Brilliance
+option.ODC_HC_R=Hue Contrast Red
+option.ODC_HS_R=Hue Shift Red
+option.ODC_HS_G=Hue Shift Green
+option.ODC_HS_B=Hue Shift Blue
+option.ODC_HS_C=Hue Shift Cyan
+option.ODC_HS_M=Hue Shift Magenta
+option.ODC_HS_Y=Hue Shift Yellow
+
+option.ODC_TN_CON=Contrast
+option.ODC_TN_SH=Shoulder Clip
+option.ODC_TN_TOE=Toe
+option.ODC_TN_OFF=Offset
+option.ODC_TN_HCON=Contrast High (0 = Off)
+option.ODC_TN_HCON_PV=Contrast High Pivot
+option.ODC_TN_HCON_ST=Contrast High Strength
+option.ODC_TN_LCON=Contrast Low (0 = Off)
+option.ODC_TN_LCON_W=Contrast Low Width
+
+option.CT_EXPOSURE_SCALE  = Tonemap Exposure Scale
+suffix.CT_EXPOSURE_SCALE  = x
+
+screen.CAUSTICA_TONEMAP      = PsychoV Settings
+option.CT_PSY_HIGHLIGHTS     = Highlights
+option.CT_PSY_SHADOWS        = Shadows
+option.CT_PSY_CONTRAST       = Contrast
+option.CT_PSY_PURITY         = Purity
+option.CT_PSY_BLEACHING      = Bleaching
+option.CT_PSY_HUE_RESTORE    = Hue Restore
+option.CT_PSY_ADAPT_CONTRAST = Adaptation Contrast
+option.CT_PSY_CLIP_POINT     = Clip Point
+option.CT_PSY_WHITE_CURVE    = White Curve
+value.CT_PSY_WHITE_CURVE.0   = Neutwo
+value.CT_PSY_WHITE_CURVE.1   = Naka-Rushton
+option.CT_PSY_CONE_EXPONENT  = Cone Exponent
+option.CT_PSYV_PEAK          = PsychoV Peak
+option.CT_V23_PEAK           = PsychoV23 Peak
+option.CT_V23_COMPRESSION    = PsychoV23 Compression (0 = Auto)
+option.CT_V23_GAMUT          = PsychoV23 Gamut Compression
+
+# ===== Clouds (port dari The Rev) =====
+screen.CLOUDS_SETTINGS   = Clouds
+screen.LowLevelClouds    = Low-Level Clouds (Cumulus)
+screen.HighLevelClouds   = High-Level Clouds (Cirrus)
+screen.RevelationCumulus = Revelation Cumulus
+screen.ProximaCumulus    = Proxima Cumulus
+screen.RevQuality   = Quality
+screen.RevShape     = Shape
+screen.RevLighting  = Lighting
+screen.RevWind      = Wind
+screen.ProxQuality  = Quality
+screen.ProxShape    = Shape
+screen.ProxLighting = Lighting
+screen.ProxWind     = Wind
+
+option.CLOUDS                 = Volumetric Clouds
+option.CLOUD_SUN_ILLUMINANCE  = Cloud Sunlight
+option.CLOUD_SKY_ILLUMINANCE  = Cloud Skylight
+option.CLOUD_MOON_ILLUMINANCE = Cloud Moonlight
+option.CLOUD_VIEWER_ALTITUDE  = Viewer Base Altitude
+
+option.CLOUD_CU_MODE   = Cumulus Mode
+value.CLOUD_CU_MODE.0  = Off
+value.CLOUD_CU_MODE.1  = Revelation
+value.CLOUD_CU_MODE.2  = Proxima
+
+option.CLOUD_LOW_SAMPLES_MIN      = Min Samples
+option.CLOUD_LOW_SAMPLES_MAX      = Max Samples
+option.CLOUD_LOW_SUNLIGHT_SAMPLES = Sunlight Samples
+option.CLOUD_EMPTY_SPACE_SKIP     = Empty Space Skip
+option.CLOUD_LOW_WIND_SPEED       = Wind Speed
+option.CLOUD_LOW_WIND_ANGLE       = Wind Angle
+option.CLOUD_CU_ALTITUDE          = Altitude
+option.CLOUD_CU_THICKNESS         = Thickness
+option.CLOUD_CU_COVERAGE          = Coverage
+option.CLOUD_CU_DENSITY_B         = Bottom Density
+option.CLOUD_CU_DENSITY_T         = Top Density
+
+option.REV_LOW_SUNLIGHT_DETAIL_SAMPLES = Sunlight Detail Samples
+option.REV_LOW_LIGHT_DISTANCE          = Light March Distance
+option.REV_LOW_MAX_DISTANCE            = Max Distance (km)
+option.REV_LOW_MIN_TRANSMITTANCE       = Min Transmittance
+option.REV_LOW_EMPTY_SAMPLE_LIMIT      = Empty Sample Limit
+option.REV_CU_MAP_SCALE                = Cloud Map Scale
+option.REV_CU_LOCAL_COVERAGE_SCALE     = Local Coverage Scale
+option.REV_CU_RAIN_COVERAGE            = Rain Coverage
+option.REV_CU_BASE_NOISE_SCALE         = Base Noise Scale
+option.REV_CU_EROSION                  = Erosion
+option.REV_CU_NOISE_SKEW               = Noise Skew
+option.REV_CU_CURL_SCALE               = Curl Scale
+option.REV_CU_CURL_STRENGTH            = Curl Strength
+option.REV_CU_DETAIL_NOISE             = Detail Noise
+option.REV_CU_DETAIL_NOISE_SCALE       = Detail Noise Scale
+option.REV_CU_DETAIL_STRENGTH          = Detail Strength
+option.REV_LOW_EXTINCTION              = Extinction
+option.REV_LOW_ALBEDO                  = Albedo
+option.REV_LOW_SHADOW_DARKNESS         = Self-Shadow Darkness
+option.REV_LOW_MS_ENERGY               = Multi-Scatter Energy
+option.REV_LOW_SKY_OCCLUSION           = Sky Occlusion
+option.REV_LOW_GROUND_MULT             = Ground Bounce
+option.REV_LOW_POWDER                  = Powder Effect
+option.REV_LOW_POWDER_STRENGTH         = Powder Strength
+option.REV_LOW_POWDER_DEPTH            = Powder Depth
+option.REV_LOW_SUN_MULT                = Sunlight Multiplier
+option.REV_LOW_SKY_MULT                = Skylight Multiplier
+option.REV_LOW_RAIN_DARKEN             = Rain Darkening
+option.REV_LOW_WIND_VERTICAL           = Vertical Wind
+
+option.CLOUD_HIGH_ALTITUDE   = Altitude
+option.CLOUD_HIGH_THICKNESS  = Thickness
+option.CLOUD_HIGH_WIND_SPEED = Wind Speed
+option.CLOUD_HIGH_WIND_ANGLE = Wind Angle
+option.CLOUD_CI              = Cirrus
+option.CLOUD_CI_COVERAGE     = Cirrus Coverage
+option.CLOUD_CS              = Cirrostratus
+option.CLOUD_CS_COVERAGE     = Cirrostratus Coverage
+option.CLOUD_CC              = Cirrocumulus
+option.CLOUD_CC_COVERAGE     = Cirrocumulus Coverage
+option.REV_HI_SUNLIGHT_SAMPLES = Sunlight Samples
+option.REV_HI_DENSITY          = Density
+option.REV_HI_EXTINCTION       = Extinction
+option.REV_HI_ALBEDO           = Albedo
+option.REV_HI_MAP_SCALE        = Cloud Map Scale
+option.REV_HI_CURL_SCALE       = Curl Scale
+option.REV_HI_CURL_STRENGTH    = Curl Strength
+
+option.PROX_LOW_SAMPLES                 = Samples
+option.PROX_LOW_SUNLIGHT_SAMPLES        = Sunlight Samples
+option.PROX_LOW_SUNLIGHT_DETAIL_SAMPLES = Sunlight Detail Samples
+option.PROX_LOW_SKYLIGHT_SAMPLES        = Skylight Samples (0 = Approx)
+option.PROX_LOW_LIGHT_DISTANCE          = Light March Distance
+option.PROX_LOW_DETAIL_DISTANCE         = Detail Distance (km)
+option.PROX_LOW_MAX_DISTANCE            = Max Distance (km)
+option.PROX_LOW_MIN_TRANSMITTANCE       = Min Transmittance
+option.PROX_LOW_DEPTH_MODE              = Depth Mode
+value.PROX_LOW_DEPTH_MODE.0             = Proxima
+value.PROX_LOW_DEPTH_MODE.1             = Hillaire (Revelation)
+option.PROX_CU_ALTITUDE           = Altitude
+option.PROX_CU_THICKNESS          = Thickness
+option.PROX_CU_COVERAGE           = Coverage
+option.PROX_CU_RAIN_COVERAGE      = Rain Coverage
+option.PROX_CU_MAP_SCALE          = Cloud Map Scale
+option.PROX_CU_TOP_OFFSET         = Top Offset
+option.PROX_CU_BASE_NOISE_SCALE   = Base Noise Scale
+option.PROX_CU_DETAIL_NOISE_SCALE = Detail Noise Scale
+option.PROX_CU_DETAIL_STRENGTH    = Detail Strength
+option.PROX_CU_CURL_NOISE         = Curl Noise
+option.PROX_CU_CURL_STRENGTH      = Curl Strength
+option.PROX_CU_WISPY_BILLOWY      = Wispy-Billowy
+option.PROX_LOW_SCATTERING     = Scattering
+option.PROX_LOW_ABSORPTION     = Absorption
+option.PROX_LOW_PHASE          = Phase Function
+value.PROX_LOW_PHASE.0         = HG-Draine
+value.PROX_LOW_PHASE.1         = Phase LUT
+value.PROX_LOW_PHASE.2         = Triple Lobe
+option.PROX_LOW_DROPLET_SIZE   = Droplet Size (µm)
+option.PROX_LOW_MS_COUNT       = Multi-Scatter Octaves
+option.PROX_LOW_MS_FALLOFF_S   = MS Scattering Falloff
+option.PROX_LOW_MS_FALLOFF_E   = MS Extinction Falloff
+option.PROX_LOW_MS_FALLOFF_P   = MS Phase Falloff
+option.PROX_LOW_POWDER         = Powder Effect
+option.PROX_LOW_POWDER_STRENGTH = Powder Strength
+option.PROX_LOW_NORMALIZE_LIGHT = Normalize Light Dir
+option.PROX_LOW_SUN_MULT       = Sunlight Multiplier
+option.PROX_LOW_SKY_MULT       = Skylight Multiplier
+option.PROX_LOW_GROUND_MULT    = Ground Bounce
+option.PROX_LOW_RAIN_DARKEN    = Rain Darkening
+option.PROX_LOW_SHADOW_DARKNESS = Self-Shadow Darkness
+option.PROX_LOW_MS_ENERGY      = Multi-Scatter Energy
+option.PROX_LOW_SKY_OCCLUSION  = Sky Occlusion
+option.PROX_LOW_WIND_SPEED     = Wind Speed
+option.PROX_LOW_WIND_ANGLE     = Wind Angle
+option.PROX_LOW_WIND_VERTICAL  = Vertical Wind
